@@ -1,117 +1,124 @@
-# SOC Automation Lab: End-to-End Detection and Response
 
-Welcome to the SOC Automation Lab — a fully hands-on cybersecurity project designed to help aspiring blue teamers, SOC analysts, and cybersecurity enthusiasts learn how to build, automate, and manage security detection and incident response using open-source tools.
+# 🛡️ SOC Automation Lab
 
-This document serves as a complete guide and documentation for replicating the SOC Automation Lab environment, inspired by industry best practices and built from scratch with practical insight.
+A hands-on project that simulates a modern blue-team SOC environment using a fully automated detection and response pipeline. Designed for aspiring SOC analysts and blue-team enthusiasts, this lab demonstrates how to integrate tools like **Wazuh**, **Sysmon**, **Shuffle**, **TheHive**, and **VirusTotal** into a streamlined, automated workflow capable of detecting, enriching, and responding to real-world threats like **Mimikatz**.
 
+🔗 [Read the full blog post on Medium](https://medium.com/@vinuvarshith95/building-a-soc-automation-lab-phase-1-5f576b8b4497)
 
+## 📌 Table of Contents
 
-## 🧭 Table of Contents
-
-1. [Introduction](#introduction)
-2. [Project Goals](#project-goals)
-3. [Lab Environment Setup](#lab-environment-setup)
-4. [Installing and Configuring Wazuh](#installing-and-configuring-wazuh)
-5. [Installing Sysmon on Windows](#installing-sysmon-on-windows)
-6. [Ingesting Telemetry into Wazuh](#ingesting-telemetry-into-wazuh)
-7. [Custom Rule Creation for Mimikatz Detection](#custom-rule-creation-for-mimikatz-detection)
-8. [Introducing Shuffle (SOAR)](#introducing-shuffle-soar)
-9. [Integrating TheHive for Alert Management](#integrating-thehive-for-alert-management)
-10. [Building the Automation Workflow](#building-the-automation-workflow)
-11. [Enriching with VirusTotal](#enriching-with-virustotal)
-12. [Active Response with IP Blocking](#active-response-with-ip-blocking)
-13. [Email Alerts and Analyst Decision-making](#email-alerts-and-analyst-decision-making)
-14. [Conclusion](#conclusion)
+- [Overview]
+- [Tools Used]
+- [Setting Up the SOC Lab]
+- [Simulating Attacks and Automation]
+- [Architecture]
+- [Detection Rule for Mimikatz]
+- [Automation with Shuffle]
+- [Threat Intelligence Enrichment]
+- [Case Management and Alerting]
+- [Project Highlights](
+- [Conclusion]
 
 
 
-## Introduction
+## 🧠 Overview
 
-In today’s threat landscape, incident response needs to be proactive, fast, and automated. Traditional SOCs often suffer from alert fatigue, inefficient triage, and delays in responding to threats. The SOC Automation Lab tackles these issues by integrating three powerful open-source tools:
+The goal is to build an automated mini-SOC lab from scratch, where:
 
-- **Wazuh**: For log management, threat detection, and alerting.
-- **Shuffle**: As a SOAR platform to automate workflows and orchestrate actions.
-- **TheHive**: For case and alert management.
+- Sysmon collects telemetry data from a Windows machine.
+- Wazuh detects suspicious behavior using custom rules.
+- Shuffle automates enrichment and responses.
+- TheHive receives structured incidents for case management.
+- Email alerts notify analysts in real-time.
 
-By the end of this lab, you'll be able to detect a credential-dumping tool like **Mimikatz**, extract forensic data, enrich it, alert analysts, and even trigger a blocking action — all automatically.
 
-## Project Goals
 
-- Build a modular and scalable SOC automation lab.
-- Detect advanced attacker behaviors using custom detection logic.
-- Automate alert triage, data enrichment, and responsive action.
-- Learn practical implementation of SOAR principles.
-- Understand how open-source tools can integrate into an enterprise-grade security stack.
+## 🔧 Tools Used
 
-## Lab Environment Setup
+| Tool       | Purpose                                      |
+|------------|----------------------------------------------|
+| **Wazuh**  | SIEM platform for log collection and alerting |
+| **Sysmon** | Windows event logging for telemetry           |
+| **TheHive**| Incident response & case management           |
+| **Shuffle**| SOAR platform for automation workflows        |
+| **VirusTotal** | Threat intelligence enrichment (hashes)  |
+| **Windows 11**| Endpoint for attack simulation             |
+| **DigitalOcean** | Cloud platform to host Linux services  |
 
-### Hardware & Software Requirements
 
-- **Host Machine**: At least 16GB RAM, 100GB SSD, and virtualization support.
-- **VirtualBox or VMware**: To run VMs for Linux and Windows.
-- **Operating Systems**:
-  - Windows 10 (with Sysmon)
-  - Ubuntu 22.04 LTS (Wazuh, TheHive, Shuffle)
 
-You can also deploy Wazuh and TheHive to the cloud (DigitalOcean, AWS, etc.) using minimal droplets (2vCPU, 4GB RAM).
+## Setting Up the SOC Lab
 
-### Tools
+### 1. Deploy Windows 11 Client (Locally)
 
-| Tool | Purpose |
-|------|---------|
-| Wazuh | Detection, Log Management |
-| Sysmon | Windows Event Telemetry |
-| Shuffle | SOAR & Workflow Automation |
-| TheHive | Alert and Case Management |
-| VirusTotal | Threat Intelligence Enrichment |
+- Installed **Sysmon** using SwiftOnSecurity’s configuration.
+- Modified Wazuh agent's `ossec.conf` to forward Sysmon logs:
+  ```xml
+  <localfile>
+    <location>Microsoft-Windows-Sysmon/Operational</location>
+    <log_format>eventchannel</log_format>
+  </localfile>
+  ```
 
-## Installing and Configuring Wazuh
+### 2. Deploy Wazuh Manager on DigitalOcean
 
-Follow these steps to set up Wazuh on a fresh Ubuntu 22.04 instance:
+- Deployed **Ubuntu 22.04 Droplet** on DigitalOcean.
+- Installed Wazuh using the official script:
+  ```bash
+  curl -sO https://packages.wazuh.com/4.7/wazuh-install.sh
+  sudo bash ./wazuh-install.sh -a
+  ```
+- Registered the Windows endpoint using Wazuh Agent.
 
-```bash
-curl -sO https://packages.wazuh.com/4.7/wazuh-install.sh
-sudo bash ./wazuh-install.sh -a
-```
+### 3. Install TheHive on DigitalOcean
 
-Access the dashboard at `https://your-public-ip` with credentials:
+- Launched a second **Ubuntu 22.04 Droplet** on DigitalOcean.
+- Installed dependencies:
+  - **OpenJDK**, **Cassandra**, **Elasticsearch**, and **TheHive**
+- Created an admin user and generated an API key for automation.
 
-```
-User: admin
-Password: (as generated during install)
-```
 
-## Installing Sysmon on Windows
 
-On your Windows 10 VM:
+## Simulating Attacks and Automation
 
-1. Download Sysmon from Microsoft Sysinternals.
-2. Get a configuration file (e.g., from SwiftOnSecurity’s Sysmon config repo).
-3. Install with:
+### Simulating Credential Dumping with Mimikatz
 
-```powershell
-.\Sysmon64.exe -accepteula -i sysmonconfig.xml
-```
+1. Added an exception in Windows Defender for the `Downloads` folder.
+2. Renamed `mimikatz.exe` to `you_are_awesome.exe` to simulate stealthy malware behavior.
+3. Executed it to generate telemetry logs via Sysmon.
 
-Verify logs under Event Viewer > Applications and Services > Microsoft > Windows > Sysmon.
+### Enabling Archive Logging in Wazuh
 
-## Ingesting Telemetry into Wazuh
-
-Edit the `ossec.conf` file on the Windows agent:
+To log *all* data (not just alerts):
 
 ```xml
-<localfile>
-  <location>Microsoft-Windows-Sysmon/Operational</location>
-  <log_format>eventchannel</log_format>
-</localfile>
+<logall>yes</logall>
+<logall_json>yes</logall_json>
 ```
 
-Restart the Wazuh agent service and check if Sysmon logs are visible on the Wazuh dashboard.
+Also modified Filebeat config on the Wazuh server:
+```yaml
+archives:
+  enabled: true
+```
 
-## Custom Rule Creation for Mimikatz Detection
+Created a new Kibana index pattern:
+- `wazuh-archives-*`
+- Time field: `@timestamp`
 
-Create a custom rule that detects Mimikatz based on original filename:
 
+
+## Architecture
+
+![SOC_automation](https://github.com/user-attachments/assets/a42f7f13-dd99-42f0-8e3e-ec1dc44d4517)
+
+
+## Detection Rule for Mimikatz
+
+### Why?
+Even if the executable is renamed, the internal metadata reveals its original identity.
+
+### Wazuh Custom Rule:
 ```xml
 <rule id="100002" level="15">
   <if_group>sysmon_event1</if_group>
@@ -123,105 +130,92 @@ Create a custom rule that detects Mimikatz based on original filename:
 </rule>
 ```
 
-Save it to `local_rules.xml` and restart the Wazuh manager.
+- Placed in `/var/ossec/etc/rules/local_rules.xml`
+- Restarted Wazuh Manager to apply changes.
 
-## Introducing Shuffle (SOAR)
 
-Register an account at [Shuffle](https://shuffler.io) and create a new workflow. Use the **Webhook** trigger to accept events from Wazuh. Add a basic logic node to extract the alert fields.
 
-Configure Wazuh’s `ossec.conf` to include:
+## Automation with Shuffle
 
+### Webhook Setup
+
+- Created a Shuffle workflow.
+- Added **Webhook trigger node**.
+- Modified Wazuh integration:
 ```xml
 <integration>
-  <name>shuffle</name>
-  <hook_url>https://shuffler.io/api/v1/hooks/your-hook-id</hook_url>
+  <name>custom</name>
+  <hook_url>https://your-shuffle-webhook</hook_url>
   <rule_id>100002</rule_id>
-  <alert_format>json</alert_format>
 </integration>
 ```
 
-Restart Wazuh and verify that Mimikatz alerts are sent to Shuffle.
+### Extracting Hash with Regex
 
-## Integrating TheHive for Alert Management
-
-Deploy TheHive on Ubuntu using StrangeBee’s packages.
-
-Create an admin account and a separate user for Shuffle with an API key. In Shuffle, connect to TheHive and authenticate using that API key.
-
-Drag in TheHive into your workflow and configure the `Create Alert` action.
-
-## Building the Automation Workflow
-
-Your final workflow should resemble:
-
-- Webhook → Extract Hash → VirusTotal → TheHive → Email
-
-In the logic step, extract `SHA256` using regex. In VirusTotal, query the hash and get results. Use the response to populate the alert fields in TheHive.
-
-## Enriching with VirusTotal
-
-Sign up at [VirusTotal](https://virustotal.com), grab your API key, and connect it to Shuffle.
-
-Use the “Hash Report” action to fetch enrichment data. For example:
-
-```json
-{
-  "id": "{{sha256}}"
-}
+- Used the `Rex` app in Shuffle to extract SHA256:
+```regex
+sha256=([a-fA-F0-9]{64})
 ```
 
-Parse out the `last_analysis_stats.malicious` count to determine threat confidence.
 
-## Active Response with IP Blocking
 
-Wazuh supports Active Responses. You can execute firewall rules using built-in commands like `firewalldrop`. Add this configuration:
+## Threat Intelligence Enrichment
 
-```xml
-<active-response>
-  <command>firewalldrop</command>
-  <location>local</location>
-  <level>10</level>
-  <timeout>0</timeout>
-</active-response>
+### VirusTotal in Shuffle
+
+- API used to fetch file reputation using SHA256.
+- Output:
+  - File name
+  - Detection count (malicious/total)
+  - File type
+  - Antivirus flags
+
+Example:
+```
+SHA256: abcd...
+Malicious Detections: 21/70
+File: mimikatz.exe
 ```
 
-You can then call this via Shuffle using the Wazuh API integration.
-
-## Email Alerts and Analyst Decision-making
-
-Use the **Email** app in Shuffle to notify the SOC team. Populate the message with variables from the alert (hostname, timestamp, severity).
-
-You can also integrate a **User Input** node to ask analysts whether to proceed with response (e.g., block IP). If yes, trigger the active response.
-
-## Conclusion
-
-This SOC Automation Lab gives you a powerful, customizable, and fully open-source ecosystem to learn and practice blue team skills. You’ve seen how to:
-
-- Detect credential abuse tools like Mimikatz.
-- Build rules and trigger alerts.
-- Enrich events using threat intel.
-- Automate the triage and case creation process.
-- Respond actively to malicious behaviors.
-
-Automation isn’t about replacing analysts — it’s about freeing them from repetitive tasks so they can focus on real threats.
 
 
+## Case Management and Alerting
 
-## 🚀 Next Steps
+### TheHive Integration
 
-- Integrate MISP for threat intelligence sharing.
-- Add Cortex analyzers for deeper enrichment.
-- Automate Slack/Discord notifications.
-- Include DNS or network-level telemetry.
+- Connected via API key.
+- Shuffle workflow creates a **new case** in TheHive.
+- Case includes:
+  - Hostname
+  - IP address
+  - Timestamp
+  - User
+  - Rule ID & severity
+
+### Email Alert
+
+- Configured Shuffle’s Email app.
+- Sent real-time alerts with threat context.
+- Subject: `Mimikatz Alert on [hostname]`
+- Includes VirusTotal summary + attacker details.
 
 
 
-## 🙏 Acknowledgments
+## Project Highlights
 
-Special thanks to the open-source communities behind Wazuh, Shuffle, and TheHive. This lab is inspired by many DFIR professionals sharing their knowledge openly.
+✔️ Built fully from scratch using open-source tools  
+✔️ Hosted on DigitalOcean for scalability  
+✔️ Real-world attack simulation using Mimikatz  
+✔️ Custom rule writing in Wazuh  
+✔️ Full integration with SOAR and IR tools  
+✔️ Automated alerts and case generation  
+✔️ Hands-on red-team vs blue-team perspective
 
 
 
-## 📎 License
+## 🧾 Conclusion
 
-This repository is under MIT License.
+This lab is a practical demonstration of how you can set up and automate detection and response pipelines just like in enterprise SOCs. From telemetry to threat intelligence and incident management, this project covers every major SOC task. It also offers a platform to extend into more advanced detections, playbooks, and threat hunting.
+
+> 💡 Perfect for students, cybersecurity enthusiasts, and blue-teamers looking to gain hands-on SOC experience.
+
